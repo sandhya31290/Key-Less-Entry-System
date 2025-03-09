@@ -1,61 +1,84 @@
-#define BLYNK_PRINT Serial
 #include <ESP8266WiFi.h>
-#include <BlynkSimpleEsp8266.h>
-
-
-char auth[] = " ";//Enter your Auth token
-char ssid[] = " ";//Enter your WIFI name
-char pass[] = " ";//Enter your WIFI password
-BlynkTimer timer;
-#define relay1 D5
-#define relay2 D6
-#define relay3 D7
-#define relay4 D8
-
-void setup(){
-   Serial.begin(9600);
-   pinMode(relay1, OUTPUT);
-   pinMode(relay2, OUTPUT);
-   pinMode(relay3, OUTPUT);
-   pinMode(relay4, OUTPUT);
-   digitalWrite(relay1, LOW);
-   digitalWrite(relay2, LOW);
-   digitalWrite(relay3, LOW);
-   digitalWrite(relay4, LOW);   
-  Blynk.begin(auth, ssid, pass, "blynk.cloud", 80);
-}
-
-BLYNK_WRITE(V0) {
- bool RelayOne = param.asInt();
-  if (RelayOne == 0) {
-    digitalWrite(relay1, LOW);
-  } else {
-    digitalWrite(relay1, HIGH);
+#include "Adafruit_MQTT.h"
+#include "Adafruit_MQTT_Client.h"
+const char *ssid =  "Wi-Fi Name";     // Enter your WiFi Name
+const char *pass =  "Password"; // Enter your WiFi Password
+WiFiClient client;
+#define MQTT_SERV "io.adafruit.com"
+#define MQTT_PORT 1883
+#define MQTT_NAME "Adafruit IO Username" 
+#define MQTT_PASS "Your API Key" // Enter the API key that you copied from your adafrui IO account
+#define relay D5
+#define buzzer D6
+Adafruit_MQTT_Client mqtt(&client, MQTT_SERV, MQTT_PORT, MQTT_NAME, MQTT_PASS);
+//Set up the feed you're subscribing to
+Adafruit_MQTT_Subscribe Lock = Adafruit_MQTT_Subscribe(&mqtt, MQTT_NAME "/f/Lock");
+void setup()
+{
+  Serial.begin(115200);
+  delay(10);
+  mqtt.subscribe(&Lock);
+  pinMode(relay, OUTPUT);
+  pinMode(buzzer, OUTPUT);
+  digitalWrite(relay, LOW); // keep motor off initally 
+  Serial.println("Connecting to ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, pass);
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");              // print ... till not connected
   }
-}
-BLYNK_WRITE(V1) {
- bool Relaytwo = param.asInt();
-  if (Relaytwo == 0) {
-    digitalWrite(relay2, LOW);
-  } else {
-    digitalWrite(relay2, HIGH);
-  }
-}BLYNK_WRITE(V2) {
- bool Relaythree = param.asInt();
-  if (Relaythree == 0) {
-    digitalWrite(relay3, LOW);
-  } else {
-    digitalWrite(relay3, HIGH);
-  }
-}BLYNK_WRITE(V3) {
- bool Relayfour = param.asInt();
-  if (Relayfour == 0) {
-    digitalWrite(relay4, LOW);
-  } else {
-    digitalWrite(relay4, HIGH);
-  }
-}
-void loop() {
-  Blynk.run();//Run the Blynk library
-  timer.run();//Run the Blynk timer
+  Serial.println("");
+  Serial.println("WiFi connected");
 } 
+void loop()
+{
+   MQTT_connect();  
+Adafruit_MQTT_Subscribe * subscription;
+while ((subscription = mqtt.readSubscription(5000)))
+     {   
+   if (subscription == &Lock)
+     {
+      //Print the new value to the serial monitor
+      Serial.println((char*) Lock.lastread);     
+   if (!strcmp((char*) Lock.lastread, "Close"))
+      {
+        digitalWrite(relay, LOW);
+        Serial.print("Door Unlocked");
+        digitalWrite(buzzer, HIGH);
+        delay(2000);
+        digitalWrite(buzzer, LOW);
+    }
+    if (!strcmp((char*) Lock.lastread, "Open"))
+      {
+        digitalWrite(relay, HIGH);
+        Serial.print("Door Closed");
+        digitalWrite(buzzer, HIGH);
+        delay(2000);
+        digitalWrite(buzzer, LOW);
+    }
+ }  
+     } 
+}
+void MQTT_connect() 
+{
+  int8_t ret;
+  // Stop if already connected.
+  if (mqtt.connected()) 
+  {
+    return;
+  }
+  uint8_t retries = 3;
+  while ((ret = mqtt.connect()) != 0) // connect will return 0 for connected
+  {       
+       mqtt.disconnect();
+       delay(5000);  // wait 5 seconds
+       retries--;
+       if (retries == 0) 
+       {
+         // basically die and wait for WDT to reset me
+         while (1);
+       }
+  }
+}
