@@ -1,4 +1,4 @@
-# 🔑 Keyless Entry System using IoT
+# 🔑 Smart Door System using IoT
 
 This project is an **IoT-based Keyless Entry System** that allows users to lock and unlock a door remotely using **Adafruit IO (MQTT) or Blynk Cloud**. The system enhances security by eliminating the need for physical keys and provides real-time access control.
 
